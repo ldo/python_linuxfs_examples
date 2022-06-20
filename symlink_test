@@ -1,0 +1,85 @@
+#!/usr/bin/python3
+#+
+# Example use of python_linuxfs: demonstrate the various
+# options in the open_at() call for (not) following symlinks.
+# This script creates a temporary directory, puts various things
+# into it, then reports on the results of trying to access those
+# things via symlinks in various ways.
+#
+# Copyright 2022 by Lawrence D'Oliveiro <ldo@geek-central.gen.nz>. This
+# script is licensed CC0
+# <https://creativecommons.org/publicdomain/zero/1.0/>; do with it
+# what you will.
+#-
+
+import sys
+import os
+import tempfile
+import shutil
+import linuxfs as lx
+from linuxfs import \
+    OPENAT2
+
+keep_temps = os.getenv("KEEP_TEMPS", "")[:1].upper() in ("Y", "1")
+
+workdir = tempfile.mkdtemp(prefix = "openat-demo-")
+sys.stdout.write("Work dir: %s\n" % workdir)
+
+subdir = "subdir"
+subdirpath = os.path.join(workdir, subdir)
+os.mkdir(subdirpath)
+sys.stdout.write("Create dir %s\n" % subdirpath)
+subdirfd = os.open(subdirpath, os.O_PATH)
+
+file1 = os.path.join(workdir, "file1")
+out = open(file1, "wt")
+out.write("hello1\n")
+out.close()
+sys.stdout.write("Written some data to %s\n" % file1)
+file2 = os.path.join(subdirpath, "file2")
+out = open(file2, "wt")
+out.write("hello2\n")
+out.close()
+sys.stdout.write("Written some data to %s\n" % file2)
+
+symlinks = \
+    (
+        ("link1", "../file1"),
+        ("link2", "file2"),
+        ("link3", "/file2"),
+    )
+for linkfrom, linkto in symlinks :
+    os.symlink(linkto, os.path.join(subdirpath, linkfrom))
+    sys.stdout.write("symlinked %s/%s to %s\n" % (subdir, linkfrom, linkto))
+#end for
+
+for resolvedesc, resolve in \
+    (
+        ("allow everything", 0),
+        ("beneath only", OPENAT2.RESOLVE_BENEATH),
+        ("chroot", OPENAT2.RESOLVE_IN_ROOT),
+    ) \
+:
+    for linkfrom, _ in symlinks :
+        try :
+            fd = lx.open_at(subdirfd, linkfrom, flags = os.O_PATH, resolve = resolve)
+        except OSError as err :
+            errno = err.errno
+        else :
+            os.close(fd)
+            errno = 0
+        #end try
+        sys.stdout.write("open %s/%s with %s: " % (subdir, linkfrom, resolvedesc))
+        if errno != 0 :
+            sys.stdout.write("err %d" % errno)
+        else :
+            sys.stdout.write("success")
+        #end if
+        sys.stdout.write("\n")
+    #end for
+#end for
+
+os.close(subdirfd)
+if not keep_temps :
+    shutil.rmtree(workdir)
+#end if
