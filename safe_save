@@ -13,6 +13,7 @@
 #     --definite
 #         -- do a regular file create instead of a tentative create,
 #            just for comparison.
+#            Incompatible with --safe-replace.
 #     --replace
 #         -- replace any existing file named «filename». Actually
 #            the existing file is renamed to «filename»-old.
@@ -20,6 +21,12 @@
 #            For a tentative create, this error is not reported until
 #            the new file is to be given the same name. (Consider that
 #            a feature of this sample code.)
+#            Incompatible with --safe-replace.
+#     --safe-replace
+#         -- replace any existing file named «filename» in a safe
+#            fashion, so that in case of error the original file
+#            remains under its original name.
+#            Incompatible with --definite or --replace.
 #
 # Copyright 2022 by Lawrence D'Oliveiro <ldo@geek-central.gen.nz>. This
 # script is licensed CC0
@@ -35,19 +42,25 @@ import linuxfs as lx
 
 tentative = True
 replace = False
+safe_replace = False
 opts, args = getopt.getopt \
   (
     sys.argv[1:],
     "",
-    ["definite", "replace"]
+    ["definite", "replace", "safe-replace"]
   )
 for keyword, value in opts :
     if keyword == "--definite" :
         tentative = False
     elif keyword == "--replace" :
         replace = True
+    elif keyword == "--safe-replace" :
+        safe_replace = True
     #end if
 #end for
+if (replace or not tentative) and safe_replace :
+    raise getopt.GetoptError("--safe-replace is not compatible with --replace or --definite")
+#end if
 if len(args) != 2 :
     raise getopt.GetoptError("expecting just 2 args, the «filename» and the «text-line»")
 #end if
@@ -81,14 +94,26 @@ else :
 os.write(outfd, (textline + "\n").encode())
 if tentative :
     sys.stderr.write("file is currently open at /proc/%d/fd/%d\n" % (os.getpid(), outfd))
-    time.sleep(10)
-    if replace :
+    time.sleep(10) # let user examine symlinks if they should be so inclined
+    if safe_replace :
+        tempfilepath = filepath + "-new"
+        lx.save_tmpfile(outfd, tempfilepath)
         try :
-            os.rename(filepath, filepath + "-old")
+            lx.rename_at(lx.AT_FDCWD, tempfilepath, lx.AT_FDCWD, filepath, lx.RENAME_EXCHANGE)
         except FileNotFoundError :
-            pass
+            os.rename(tempfilepath, filepath)
+        else :
+            os.unlink(tempfilepath)
         #end try
+    else :
+        if replace :
+            try :
+                os.rename(filepath, filepath + "-old")
+            except FileNotFoundError :
+                pass
+            #end try
+        #end if
+        lx.save_tmpfile(outfd, filepath)
     #end if
-    lx.save_tmpfile(outfd, filepath)
 #end if
 os.close(outfd)
