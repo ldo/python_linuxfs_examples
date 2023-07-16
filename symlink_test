@@ -6,7 +6,7 @@
 # into it, then reports on the results of trying to access those
 # things via symlinks in various ways.
 #
-# Copyright 2022 by Lawrence D'Oliveiro <ldo@geek-central.gen.nz>. This
+# Copyright 2022-2023 by Lawrence D'Oliveiro <ldo@geek-central.gen.nz>. This
 # script is licensed CC0
 # <https://creativecommons.org/publicdomain/zero/1.0/>; do with it
 # what you will.
@@ -65,7 +65,9 @@ for resolvedesc, resolve in \
             fd = lx.open_at(subdirfd, linkfrom, flags = os.O_PATH, resolve = resolve)
         except OSError as err :
             errno = err.errno
+            actual_path = None
         else :
+            actual_path = os.readlink(lx.get_magic_symlink(fd))
             os.close(fd)
             errno = 0
         #end try
@@ -73,7 +75,7 @@ for resolvedesc, resolve in \
         if errno != 0 :
             sys.stdout.write("err %d" % errno)
         else :
-            sys.stdout.write("success")
+            sys.stdout.write("=> %s success" % actual_path)
         #end if
         sys.stdout.write("\n")
     #end for
