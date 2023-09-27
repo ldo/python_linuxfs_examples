@@ -1,6 +1,4 @@
-This repo contains examples of how to use my `python_linuxfs` module
-(available on [GitLab](https://gitlab.com/ldo/python_linuxfs) and
-[BitBucket](https://bitbucket.org/ldo17/python_linuxfs)).
-
-Lawrence D'Oliveiro <ldo@geek-central.gen.nz>
-2023 September 27
+This project is no longer being maintained on GitHub.
+Look for it at one of
+* gitlab: https://gitlab.com/ldo/python_linuxfs_examples
+* bitbucket: https://bitbucket.org/ldo17/python_linuxfs_examples
